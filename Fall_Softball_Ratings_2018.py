@@ -140,10 +140,60 @@ def build_id_to_classname(team_to_class, schools_csv=SCHOOLS_CSV):
  
     MANUAL_OVERRIDES covers schools whose mshsaa_schools.csv name does not
     match their classifications.json name (renamed/merged co-op schools,
-    etc). Empty for now -- populate by looking up each school's ID directly
-    from the MSHSAA fall softball scoreboard pages as you find mismatches.
+    etc). Populated from the 2012 missing-teams review -- add more here as
+    you find additional mismatches from the MSHSAA fall softball scoreboard.
     """
     MANUAL_OVERRIDES = {
+        "169": "St. Charles West",
+        "194": "Smith-Cotton",
+        "197": "South Callaway",
+        "198": "Truman",
+        "199": "Twin Rivers",
+        "205": "Steelville",
+        "206": "Vashon",
+        "207": "Sullivan",
+        "328": "Jefferson (Conception) with South Nodaway",
+        "409": "Pattonsburg",
+        "430": "Russellville",
+        "431": "Salisbury",
+        "435": "Scott City",
+        "437": "Seymour",
+        "439": "Sherwood",
+        "440": "Silex",
+        "443": "Skyline",
+        "446": "South Harrison",
+        "454": "Southwest (Livingston County)",
+        "455": "Southwest (Washburn)",
+        "460": "Stanberry",
+        "464": "Stoutland",
+        "466": "Strafford",
+        "467": "Sturgeon",
+        "473": "Tina-Avalon with Southwest (Livingston County)",
+        "543": "St. Elizabeth Academy",
+        "555": "Saxony Lutheran",
+        "574": "New Heights Christian with McAuley Catholic",
+        "776": "Transportation and Law with Beaumont",
+        "193": "Slater",
+        "445": "Smithville",
+        "449": "South Nodaway",
+        "458": "St. Elizabeth",
+        "544": "St. Francis Borgia",
+        "465": "Stover",
+        "309": "Hale",
+        "375": "Neosho",
+        "388": "North Nodaway",
+        "427": "Ridgeway with Cainsville",
+        "463": "Stockton",
+        "350": "Macon County with Bucklin",
+        "364": "Mercer",
+        "578": "Rock Bridge",
+        "245": "Brunswick with Keytesville",
+        "240": "Braymer with Breckenridge",
+        "291": "Fair Play",
+        "301": "Gilman City with North Daviess",
+        "85": "Hickman with Columbia Independent",
+        "156": "Paris with Faith Walk",
+        "447": "South Holt",
     }
  
     df = pd.read_csv(schools_csv)
@@ -443,6 +493,40 @@ def report_missing_teams(all_games, team_to_class):
     else:
         print("\n  All classification schools have at least one game. \n")
  
+    return missing
+ 
+ 
+def send_missing_teams_notification(missing_teams):
+    """
+    Pop a desktop notification once the script finishes if any
+    classifications.json teams ended up with 0 games in the scraped data.
+    Uses plyer (cross-platform notification library) -- install with:
+        pip install plyer
+    If plyer isn't installed, this just prints the same info to the
+    console instead of raising an error, so a missing dependency never
+    breaks the rest of the run.
+    """
+    if not missing_teams:
+        return
+ 
+    title = f"MSHSAA Fall Softball Ratings {SEASON_YEAR}"
+    preview = ", ".join(missing_teams[:5])
+    if len(missing_teams) > 5:
+        preview += f", +{len(missing_teams) - 5} more"
+    message = f"{len(missing_teams)} team(s) with 0 games:\n{preview}"
+ 
+    try:
+        from plyer import notification
+        notification.notify(
+            title=title,
+            message=message,
+            app_name="MSHSAA Ratings",
+            timeout=15,
+        )
+    except Exception as e:
+        print(f"\n  [Desktop notification skipped -- {e}]")
+        print(f"  {title}: {message}")
+ 
  
 # ---------------------------------------------------------------------------
 # CSV OUTPUT
@@ -610,7 +694,7 @@ def save_overall_json(off_rating, def_rating, ovr_rating, league_avg,
  
 def save_class_jsons(off_rating, def_rating, ovr_rating, league_avg,
                      team_to_class, team_to_district):
-    for cls in range(1, 6):  # MSHSAA fall softball has 5 classes, not football's 6
+    for cls in range(1, 5):  # 2012 fall softball only had 4 classes -- Class 5 wasn't added until 2020
         entries = build_team_entries(off_rating, def_rating, ovr_rating,
                                      team_to_class, team_to_district,
                                      class_filter=cls)
@@ -703,11 +787,11 @@ def save_rankings_csv(off_rating, def_rating, ovr_rating,
  
 def save_all_rankings_csvs(off_rating, def_rating, ovr_rating,
                            team_to_class, team_to_district):
-    """Save overall + one CSV per class (1-5)."""
+    """Save overall + one CSV per class (1-4)."""
     save_rankings_csv(off_rating, def_rating, ovr_rating,
                       team_to_class, team_to_district,
                       class_filter=None)
-    for cls in range(1, 6):  # MSHSAA fall softball has 5 classes, not football's 6
+    for cls in range(1, 5):  # 2012 fall softball only had 4 classes -- Class 5 wasn't added until 2020
         save_rankings_csv(off_rating, def_rating, ovr_rating,
                           team_to_class, team_to_district,
                           class_filter=cls)
@@ -748,7 +832,7 @@ if __name__ == "__main__":
     all_games = deduplicate_games(all_games)
  
     print("\nChecking for missing teams...")
-    report_missing_teams(all_games, team_to_class)
+    missing_teams = report_missing_teams(all_games, team_to_class)
  
     print("Saving scoreboard CSV...")
     save_csv(all_games)
@@ -770,3 +854,5 @@ if __name__ == "__main__":
                            team_to_class, team_to_district)
  
     print("\n=== Done ===")
+ 
+    send_missing_teams_notification(missing_teams)
